@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Hook de pre-commit: corre ./verificar.sh solo si el commit toca archivos que
+# el CI verifica. Un commit de documentación no debe esperar a que arranquen
+# contenedores.
+#
+# Se activa con:  git config core.hooksPath .githooks
+set -euo pipefail
+
+tocados="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if ! printf '%s\n' "$tocados" | grep -qE '^(docker-compose\.yml|verificar\.sh|scripts/|\.github/workflows/)'; then
+    exit 0
+fi
+
+echo 'pre-commit: el commit toca configuracion verificada por CI, ejecutando ./verificar.sh'
+./verificar.sh

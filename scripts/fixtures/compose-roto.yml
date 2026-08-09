@@ -1,0 +1,19 @@
+# Fixture DELIBERADAMENTE roto. No se usa para levantar nada.
+#
+# Existe para probar el guardia en el sentido que importa: que SÍ detecte lo que
+# dice detectar. Un check validado solo contra el caso bueno no está validado —
+# pasaría igual de verde si estuviera comprobando la nada.
+#
+# Contiene los cuatro fallos a la vez: volumen no external, imagen :latest,
+# /files sin autorizar, y sin restart ni healthcheck.
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./local-files:/files
+
+volumes:
+  n8n_data:
