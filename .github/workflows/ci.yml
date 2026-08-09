@@ -26,7 +26,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable \
             verificar.sh scripts/check-compose.sh \
-            scripts/preparar-local-files.sh .githooks/pre-commit
+            scripts/preparar-local-files.sh scripts/probar-permisos.sh \
+            .githooks/pre-commit
+
+      # Comprueba que preparar-local-files.sh deja la carpeta escribible por el
+      # contenedor SIN quitarsela al usuario del host. Corre en un contenedor
+      # con uids controlados, asi que da el mismo resultado en el runner y en
+      # una maquina Windows, donde el fallo original era invisible.
+      - name: Permisos de local-files en un Linux real
+        run: bash scripts/probar-permisos.sh
 
       - name: Guardia de configuración
         run: bash scripts/check-compose.sh docker-compose.yml
