@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Avisa cuando sale una versión nueva de n8n. Al estar la imagen fijada, la
+  # actualización llega como PR revisable en vez de colarse en un `pull`.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(docker)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"

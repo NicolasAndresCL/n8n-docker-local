@@ -1,0 +1,26 @@
+name: Propuesta de mejora
+description: Sugerir un cambio en la configuración, el CI o la documentación
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: Qué se vuelve difícil o frágil hoy sin este cambio.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: datos
+    attributes:
+      label: Impacto sobre los datos
+      options:
+        - label: El cambio NO altera el volumen `n8n_data` ni su declaración `external: true`
+        - label: Si lo altera, la propuesta incluye cómo respaldar y restaurar
