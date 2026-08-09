@@ -28,9 +28,13 @@ En **Linux y macOS**, una vez tras clonar:
 bash scripts/preparar-local-files.sh
 ```
 
-El contenedor corre como uid 1000 y un bind mount conserva el dueño del host,
-así que sin ese paso los nodos de archivo fallan con *Permission denied*. En
-Windows el script no hace nada porque Docker Desktop no propaga permisos POSIX.
+El contenedor corre como uid 1000 y un bind mount conserva dueño y permisos del
+host, así que sin ese paso los nodos de archivo fallan con *Permission denied*.
+El script concede acceso con `chmod` en lugar de cambiar el propietario: así el
+contenedor puede escribir **sin** que tú pierdas la escritura sobre tu propia
+carpeta, y no hace falta `sudo`. Si tu usuario ya es uid 1000, no hace nada.
+
+En Windows tampoco hace nada, porque Docker Desktop no propaga permisos POSIX.
 
 Los comandos del CLI de n8n se ejecutan dentro del contenedor:
 
@@ -84,10 +88,16 @@ Los respaldos quedan en `backups/`, ignorada por git.
 Tres jobs, los rápidos primero:
 
 1. **`lint`** — sintaxis del compose, `shellcheck` sobre los scripts, el guardia
-   de configuración y `actionlint`. Incluye una prueba en negativo: el CI falla
-   si el guardia *acepta* un compose deliberadamente roto, porque un check que
-   solo se ha probado en el caso bueno pasaría igual de verde comprobando la
-   nada.
+   de configuración, la prueba de permisos y `actionlint`. Incluye una prueba en
+   negativo: el CI falla si el guardia *acepta* un compose deliberadamente roto,
+   porque un check que solo se ha probado en el caso bueno pasaría igual de
+   verde comprobando la nada.
+
+   `scripts/probar-permisos.sh` levanta un contenedor con uids controlados para
+   comprobar que `local-files` queda escribible por el contenedor **y** por el
+   host. Existe porque ese fallo es invisible en Windows, donde Docker Desktop
+   no propaga permisos POSIX: sin esta prueba, la única forma de detectarlo era
+   pushear y esperar al CI.
 2. **`secretos`** — `gitleaks` sobre el historial, más una comprobación de que
    los patrones sensibles de este repo (credenciales OAuth, códigos 2FA,
    respaldos) siguen cubiertos por `.gitignore`.
@@ -118,6 +128,7 @@ verificar.sh                     reproduce el job de lint en local
 local-files/                     intercambio de archivos con el contenedor
 scripts/check-compose.sh         guardia de configuración
 scripts/preparar-local-files.sh  permisos del bind mount (Linux y macOS)
+scripts/probar-permisos.sh       verifica lo anterior en un Linux simulado
 scripts/fixtures/                compose roto y workflow de prueba, para los
                                  checks en negativo y de persistencia
 .githooks/pre-commit             verificación antes de commitear
