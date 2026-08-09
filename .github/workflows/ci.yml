@@ -17,10 +17,16 @@ jobs:
     name: Lint y guardia de configuración
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Sintaxis del compose
         run: docker compose config --quiet
+
+      - name: Análisis estático de los scripts
+        run: |
+          docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable \
+            verificar.sh scripts/check-compose.sh \
+            scripts/preparar-local-files.sh .githooks/pre-commit
 
       - name: Guardia de configuración
         run: bash scripts/check-compose.sh docker-compose.yml
@@ -38,20 +44,59 @@ jobs:
       - name: Lint de workflows
         uses: docker://rhysd/actionlint:latest
 
-  # Minutos. La prueba que de verdad importa: que n8n ARRANQUE con esta
-  # configuración y responda, no solo que el YAML esté bien escrito.
-  smoke:
-    name: n8n arranca y responde
+  # El directorio de trabajo contiene credenciales OAuth y códigos 2FA reales,
+  # protegidos solo por .gitignore. En un repo público, una regla mal escrita
+  # que deje de cubrirlos es un incidente, no una errata.
+  secretos:
+    name: Sin secretos versionados
     runs-on: ubuntu-latest
-    needs: lint
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Escaneo con gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # gitleaks busca patrones de secreto; esto comprueba lo específico de este
+      # repo: que los archivos que sabemos peligrosos sigan estando ignorados.
+      - name: Los archivos sensibles siguen ignorados
+        run: |
+          fallos=0
+          for patron in 'client_secret_ejemplo.apps.googleusercontent.com.json' \
+                        'Backup-codes-ejemplo.txt' \
+                        '.env' \
+                        'backups/n8n_data-ejemplo.tar.gz'; do
+            if ! git check-ignore -q "$patron"; then
+              echo "::error::'$patron' NO esta cubierto por .gitignore"
+              fallos=$((fallos + 1))
+            fi
+          done
+          [ "$fallos" -eq 0 ] || exit 1
+          echo 'Todos los patrones sensibles siguen ignorados.'
+
+  # Minutos. La prueba que de verdad importa: que n8n ARRANQUE con esta
+  # configuración, responda y no pierda datos.
+  smoke:
+    name: n8n arranca, responde y conserva los datos
+    runs-on: ubuntu-latest
+    needs: [lint, secretos]
+    steps:
+      - uses: actions/checkout@v7
 
       # En CI no existe el volumen de datos real (vive en la máquina de
       # desarrollo). Se crea vacío: n8n debe ser capaz de inicializar su base
       # desde cero con esta misma configuración.
       - name: Crear volumen externo vacío
         run: docker volume create n8n_data
+
+      # Mismo script que documenta el README para Linux y macOS. El CI ejecuta
+      # el procedimiento real, no un atajo: si aquí hiciera un `chmod 777`
+      # suelto, el pipeline pasaría y el usuario seguiría fallando.
+      - name: Preparar permisos de local-files
+        run: bash scripts/preparar-local-files.sh
 
       - name: Levantar n8n
         run: docker compose up -d
@@ -87,11 +132,37 @@ jobs:
           fi
 
       # El montaje de /files es inútil si n8n no puede escribir ahí. Se prueba
-      # escribiendo desde dentro del contenedor y leyendo desde el host.
-      - name: El volumen de archivos es escribible desde el contenedor
+      # en las dos direcciones, porque cada una falla por motivos distintos:
+      # escritura por permisos del bind mount, lectura por el montaje en sí.
+      - name: El volumen de archivos funciona en ambas direcciones
         run: |
-          docker compose exec -T n8n sh -c 'echo ci-ok > /files/prueba.txt'
-          grep -q 'ci-ok' local-files/prueba.txt
+          docker compose exec -T n8n sh -c 'echo ci-ok > /files/desde-contenedor.txt'
+          grep -q 'ci-ok' local-files/desde-contenedor.txt
+
+          echo 'desde-host' > local-files/desde-host.txt
+          docker compose exec -T n8n grep -q 'desde-host' /files/desde-host.txt
+
+      # La razón de ser de todo este proyecto: que los datos sobrevivan. Se
+      # importa un workflow, se destruye el contenedor y se comprueba que sigue
+      # ahí. Es la regresión que protege contra perder el `external: true`.
+      - name: Los datos sobreviven a destruir el contenedor
+        run: |
+          docker compose cp scripts/fixtures/workflow-prueba.json n8n:/tmp/workflow-prueba.json
+          docker compose exec -T n8n n8n import:workflow --input=/tmp/workflow-prueba.json
+
+          docker compose down
+          docker compose up -d
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect n8n --format '{{.State.Health.Status}}')" = 'healthy' ] && break
+            sleep 5
+          done
+
+          if ! docker compose exec -T n8n n8n list:workflow | grep -q 'ciPersistencia01'; then
+            echo '::error::El workflow no sobrevivio al reinicio: se estan perdiendo datos.'
+            docker compose logs
+            exit 1
+          fi
+          echo 'Los datos persisten tras destruir y recrear el contenedor.'
 
       - name: Logs en caso de fallo
         if: failure()

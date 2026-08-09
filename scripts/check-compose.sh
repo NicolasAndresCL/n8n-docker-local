@@ -59,13 +59,17 @@ fi
 
 # 4. Disponibilidad: sin restart no vuelve tras reiniciar el equipo, y sin
 #    healthcheck "arriba" solo significa que el proceso existe.
-grep -qE '^\s*restart:\s*unless-stopped\s*$' "$COMPOSE" \
-    && ok 'restart: unless-stopped' \
-    || fallo 'falta restart: unless-stopped'
+if grep -qE '^\s*restart:\s*unless-stopped\s*$' "$COMPOSE"; then
+    ok 'restart: unless-stopped'
+else
+    fallo 'falta restart: unless-stopped'
+fi
 
-grep -qE '^\s*healthcheck:\s*$' "$COMPOSE" \
-    && ok 'healthcheck definido' \
-    || fallo 'falta healthcheck'
+if grep -qE '^\s*healthcheck:\s*$' "$COMPOSE"; then
+    ok 'healthcheck definido'
+else
+    fallo 'falta healthcheck'
+fi
 
 if [ "$fallos" -gt 0 ]; then
     printf '\n%s comprobacion(es) fallida(s) en %s\n' "$fallos" "$COMPOSE" >&2

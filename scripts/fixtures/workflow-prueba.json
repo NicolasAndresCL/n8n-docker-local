@@ -1,0 +1,16 @@
+{
+  "id": "ciPersistencia01",
+  "name": "CI - prueba de persistencia",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "3f8c1a52-1d4e-4b7a-9c21-6e0f5a7b8c90",
+      "name": "Disparador manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    }
+  ],
+  "connections": {},
+  "settings": {}
+}
