@@ -1,0 +1,8 @@
+# Los scripts corren en contenedores Linux y en runners de Ubuntu: con finales
+# de línea CRLF fallan con "bad interpreter: /usr/bin/env bash^M".
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf

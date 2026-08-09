@@ -1,0 +1,36 @@
+# --- Secretos -----------------------------------------------------------
+# Esta carpeta contiene credenciales reales. El repo es PUBLICO: nada de esto
+# puede llegar a un commit.
+client_secret_*.json
+Backup-codes-*.txt
+.env
+.env.*
+*.pem
+*.key
+
+# Exports de workflows del curso: no llevan secretos, pero sí el correo del
+# instructor y enlaces a Sheets de terceros. Además es material ajeno. Fuera de
+# un repo publico.
+*Scraper.json
+*Formulario*.json
+
+# --- Datos y respaldos --------------------------------------------------
+backups/
+*.tar.gz
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Carpeta de intercambio con el contenedor: su contenido es efímero y puede
+# incluir datos de trabajo. Se versiona solo el marcador.
+local-files/*
+!local-files/.gitkeep
+
+# --- Documentación interna (no versionada, por convención) --------------
+CLAUDE.md
+memory.md
+
+# --- Sistema ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
