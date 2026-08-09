@@ -22,6 +22,24 @@ docker compose down       # parar — NO borra el volumen ni los workflows
 ./verificar.sh            # reproducir el lint de CI en local
 ```
 
+En **Linux y macOS**, una vez tras clonar:
+
+```bash
+bash scripts/preparar-local-files.sh
+```
+
+El contenedor corre como uid 1000 y un bind mount conserva el dueño del host,
+así que sin ese paso los nodos de archivo fallan con *Permission denied*. En
+Windows el script no hace nada porque Docker Desktop no propaga permisos POSIX.
+
+Los comandos del CLI de n8n se ejecutan dentro del contenedor:
+
+```bash
+docker compose exec n8n n8n list:workflow                          # listar
+docker compose exec n8n n8n export:workflow --backup --output=/files/backup/
+docker compose exec n8n n8n import:workflow --separate --input=/files/backup/
+```
+
 ## Dónde viven los datos
 
 Todo lo que importa —workflows, credenciales y la clave de cifrado— está en el
@@ -63,15 +81,21 @@ Los respaldos quedan en `backups/`, ignorada por git.
 
 ## CI
 
-Dos jobs en cascada, rápido primero:
+Tres jobs, los rápidos primero:
 
-1. **`lint`** — sintaxis del compose, el guardia de configuración y
-   `actionlint`. Incluye una prueba en negativo: el CI falla si el guardia
-   *acepta* un compose deliberadamente roto, porque un check que solo se ha
-   probado en el caso bueno pasaría igual de verde comprobando la nada.
-2. **`smoke`** — levanta n8n de verdad con un volumen vacío, espera a que el
-   healthcheck pase a `healthy`, comprueba que el puerto publicado devuelve 200
-   y que el contenedor puede escribir en `/files`.
+1. **`lint`** — sintaxis del compose, `shellcheck` sobre los scripts, el guardia
+   de configuración y `actionlint`. Incluye una prueba en negativo: el CI falla
+   si el guardia *acepta* un compose deliberadamente roto, porque un check que
+   solo se ha probado en el caso bueno pasaría igual de verde comprobando la
+   nada.
+2. **`secretos`** — `gitleaks` sobre el historial, más una comprobación de que
+   los patrones sensibles de este repo (credenciales OAuth, códigos 2FA,
+   respaldos) siguen cubiertos por `.gitignore`.
+3. **`smoke`** — levanta n8n de verdad con un volumen vacío, espera a `healthy`,
+   comprueba que el puerto publicado devuelve 200, que `/files` funciona en
+   ambas direcciones y que **un workflow importado sobrevive a destruir y
+   recrear el contenedor**. Esa última es la regresión que protege contra perder
+   el `external: true`.
 
 El guardia (`scripts/check-compose.sh`) verifica cuatro cosas cuya ausencia ya
 causó o habría causado un incidente: volumen no externo, imagen en `:latest`,
@@ -89,13 +113,15 @@ workflows: un commit de documentación no espera a que arranquen contenedores.
 ## Estructura
 
 ```
-docker-compose.yml            configuración del servicio
-verificar.sh                  reproduce el job de lint en local
-local-files/                  intercambio de archivos con el contenedor
-scripts/check-compose.sh      guardia de configuración
-scripts/fixtures/             compose roto, para probar el guardia en negativo
-.githooks/pre-commit          verificación antes de commitear
-.github/workflows/ci.yml      pipeline
+docker-compose.yml               configuración del servicio
+verificar.sh                     reproduce el job de lint en local
+local-files/                     intercambio de archivos con el contenedor
+scripts/check-compose.sh         guardia de configuración
+scripts/preparar-local-files.sh  permisos del bind mount (Linux y macOS)
+scripts/fixtures/                compose roto y workflow de prueba, para los
+                                 checks en negativo y de persistencia
+.githooks/pre-commit             verificación antes de commitear
+.github/workflows/ci.yml         pipeline
 ```
 
 ## Nota sobre credenciales

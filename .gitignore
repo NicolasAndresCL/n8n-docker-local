@@ -29,6 +29,7 @@ local-files/*
 # --- Documentación interna (no versionada, por convención) --------------
 CLAUDE.md
 memory.md
+pasos*
 
 # --- Sistema ------------------------------------------------------------
 .DS_Store
