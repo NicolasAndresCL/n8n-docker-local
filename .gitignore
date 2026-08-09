@@ -30,6 +30,7 @@ local-files/*
 CLAUDE.md
 memory.md
 pasos*
+pendientes.md
 
 # --- Sistema ------------------------------------------------------------
 .DS_Store

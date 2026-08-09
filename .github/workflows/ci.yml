@@ -76,7 +76,8 @@ jobs:
           for patron in 'client_secret_ejemplo.apps.googleusercontent.com.json' \
                         'Backup-codes-ejemplo.txt' \
                         '.env' \
-                        'backups/n8n_data-ejemplo.tar.gz'; do
+                        'backups/n8n_data-ejemplo.tar.gz' \
+                        'pendientes.md'; do
             if ! git check-ignore -q "$patron"; then
               echo "::error::'$patron' NO esta cubierto por .gitignore"
               fallos=$((fallos + 1))
