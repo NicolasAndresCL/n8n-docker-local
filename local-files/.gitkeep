@@ -1,0 +1,4 @@
+# Carpeta de intercambio con el contenedor de n8n: se monta como /files.
+# El contenido real está ignorado por git; este archivo solo preserva la carpeta,
+# porque si no existe en el host, Docker la crearía como root y n8n no podría
+# escribir en ella.

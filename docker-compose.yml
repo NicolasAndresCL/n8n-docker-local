@@ -1,0 +1,72 @@
+# n8n — instancia local de automatización (curso Udemy + workflows propios).
+#
+# Reutiliza el volumen Docker YA EXISTENTE `n8n_data`, donde vive la
+# database.sqlite real (~84 MB) con los workflows y credenciales ya creados.
+# Se declara `external: true` a propósito: sin eso, Compose crearía un volumen
+# nuevo con el prefijo del proyecto (`n8n_n8n_data` — que ya existe VACÍO de un
+# intento anterior) y n8n arrancaría desde cero.
+#
+# La clave de cifrado de credenciales vive en `config`, dentro del mismo
+# volumen, así que las credenciales guardadas se siguen descifrando sin tener
+# que declarar N8N_ENCRYPTION_KEY aquí.
+#
+#   Levantar:  docker compose up -d
+#   Logs:      docker compose logs -f
+#   Parar:     docker compose down          (NO borra el volumen)
+#   UI:        http://localhost:5678
+#
+# Respaldo del volumen antes de cualquier cambio grande (upgrade de versión,
+# pruebas destructivas):
+#   docker run --rm -v n8n_data:/data:ro -v "${PWD}/backups:/backup" alpine \
+#     tar czf /backup/n8n_data-manual.tar.gz -C /data .
+
+services:
+  n8n:
+    # Versión fijada, no `latest`: un `docker compose pull` accidental no debe
+    # migrar la base a un esquema nuevo sin que sea una decisión consciente.
+    # 2.28.7 es exactamente la que ya venías corriendo.
+    image: docker.n8n.io/n8nio/n8n:2.28.7
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Sin esto, los nodos Cron/Schedule interpretan las horas en UTC y los
+      # workflows programados disparan 4 horas corridas.
+      GENERIC_TIMEZONE: America/Santiago
+      TZ: America/Santiago
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      # n8n 2.x restringe el acceso a disco a ~/.n8n-files por defecto. Sin esta
+      # variable, montar ./local-files no sirve de nada: los nodos Read/Write
+      # File fallan con "access denied" pese a que el volumen está montado.
+      N8N_RESTRICT_FILE_ACCESS_TO: /files
+      # Los binarios van a disco en vez de a memoria: un adjunto grande en un
+      # workflow no debe tumbar el contenedor.
+      N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Intercambio de archivos con el host: lo que dejes en ./local-files se ve
+      # dentro del contenedor como /files (rutas absolutas en los nodos).
+      - ./local-files:/files
+    # "Sano" aquí no es "el proceso node sigue vivo", sino que n8n haya
+    # terminado migraciones y tenga la SQLite accesible: eso es justo lo que
+    # responde /healthz/readiness.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz/readiness"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # n8n corriendo 24/7 llena el disco de logs sin un tope explícito.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # `external: true` = usa el volumen que YA existe, no crea uno nuevo.
+  # Ver la nota de la cabecera antes de cambiar esta línea.
+  n8n_data:
+    external: true
